@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 
-export default function TransactionForm({ onAdd, editing, onUpdate, cancelEdit }) {
+export default function TransactionForm({ onAdd, onUpdate, editing, cancelEdit }) {
   const [form, setForm] = useState({
-    description: "",
-    amount: "",
     type: "income",
+    category: "",
+    amount: "",
+    date: "",
+    note: "",
+    description: "",
   });
 
   useEffect(() => {
@@ -17,54 +20,25 @@ export default function TransactionForm({ onAdd, editing, onUpdate, cancelEdit }
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (editing) {
-      // UPDATE
-      const res = await fetch(`http://localhost:8080/transactions/${editing.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (res.ok) {
-        await onUpdate();
-        cancelEdit();
-        setForm({ description: "", amount: "", type: "income" });
-      }
+      onUpdate({ ...form, id: editing.id });
     } else {
-      // CREATE
-      const res = await fetch("http://localhost:8080/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (res.ok) {
-        await onAdd();
-        setForm({ description: "", amount: "", type: "income" });
-      }
+      onAdd(form);
     }
+    setForm({
+      type: "income",
+      category: "",
+      amount: "",
+      date: "",
+      note: "",
+      description: "",
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="p-4 bg-white shadow rounded mb-4">
-      <input
-        type="text"
-        name="description"
-        placeholder="Deskripsi"
-        value={form.description}
-        onChange={handleChange}
-        className="border p-2 rounded w-full mb-2"
-        required
-      />
-      <input
-        type="number"
-        name="amount"
-        placeholder="Jumlah"
-        value={form.amount}
-        onChange={handleChange}
-        className="border p-2 rounded w-full mb-2"
-        required
-      />
       <select
         name="type"
         value={form.type}
@@ -74,6 +48,51 @@ export default function TransactionForm({ onAdd, editing, onUpdate, cancelEdit }
         <option value="income">Pemasukan</option>
         <option value="expense">Pengeluaran</option>
       </select>
+
+      <input
+        type="text"
+        name="category"
+        placeholder="Kategori"
+        value={form.category}
+        onChange={handleChange}
+        className="border p-2 rounded w-full mb-2"
+        required
+      />
+
+      <input
+        type="number"
+        name="amount"
+        placeholder="Jumlah"
+        value={form.amount}
+        onChange={handleChange}
+        className="border p-2 rounded w-full mb-2"
+        required
+      />
+
+      <input
+        type="date"
+        name="date"
+        value={form.date}
+        onChange={handleChange}
+        className="border p-2 rounded w-full mb-2"
+      />
+
+      <textarea
+        name="note"
+        placeholder="Catatan"
+        value={form.note}
+        onChange={handleChange}
+        className="border p-2 rounded w-full mb-2"
+      />
+
+      <textarea
+        name="description"
+        placeholder="Deskripsi"
+        value={form.description}
+        onChange={handleChange}
+        className="border p-2 rounded w-full mb-2"
+      />
+
       <div className="flex gap-2">
         <button
           type="submit"

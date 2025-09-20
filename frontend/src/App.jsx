@@ -7,12 +7,42 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [editing, setEditing] = useState(null);
 
+  // Ambil semua transaksi dari backend
   const fetchTransactions = async () => {
     const res = await fetch("http://localhost:8080/transactions");
     const data = await res.json();
     setTransactions(data);
   };
 
+  // Tambah transaksi
+  const addTransaction = async (transaction) => {
+    const res = await fetch("http://localhost:8080/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(transaction),
+    });
+    if (res.ok) {
+      fetchTransactions();
+    }
+  };
+
+  // Update transaksi
+  const updateTransaction = async (transaction) => {
+    const res = await fetch(
+      `http://localhost:8080/transactions/${transaction.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(transaction),
+      }
+    );
+    if (res.ok) {
+      fetchTransactions();
+      setEditing(null);
+    }
+  };
+
+  // Hapus transaksi
   const handleDelete = async (id) => {
     await fetch(`http://localhost:8080/transactions/${id}`, {
       method: "DELETE",
@@ -20,10 +50,12 @@ function App() {
     fetchTransactions();
   };
 
+  // Mulai edit
   const handleEdit = (transaction) => {
     setEditing(transaction);
   };
 
+  // Batal edit
   const cancelEdit = () => {
     setEditing(null);
   };
@@ -43,8 +75,8 @@ function App() {
 
       {/* Form & List */}
       <TransactionForm
-        onAdd={fetchTransactions}
-        onUpdate={fetchTransactions}
+        onAdd={addTransaction}
+        onUpdate={updateTransaction}
         editing={editing}
         cancelEdit={cancelEdit}
       />
