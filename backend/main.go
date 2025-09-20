@@ -1,82 +1,91 @@
 package main
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"net/http"
 )
 
-// Model transaksi
 type Transaction struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Description string    `json:"description"`
-	Amount      float64   `json:"amount"`
-	Date        time.Time `json:"date"`
+	ID          uint    `json:"id" gorm:"primaryKey"`
+	Type        string  `json:"type"`        // income / expense
+	Category    string  `json:"category"`    // contoh: "Makanan", "Transportasi"
+	Amount      float64 `json:"amount"`      // pakai float64 biar cocok dengan double
+	Date        string  `json:"date"`        // format "YYYY-MM-DD"
+	Note        string  `json:"note"`
+	Description string  `json:"description"`
 }
 
-var DB *gorm.DB
 
-// Koneksi database
-func initDB() {
-	dsn := "root:@tcp(127.0.0.1:3306)/finance_db?charset=utf8mb4&parseTime=True&loc=Local"
-	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		panic("Gagal koneksi database")
-	}
-
-	// Migrasi tabel
-	database.AutoMigrate(&Transaction{})
-	DB = database
-}
+var db *gorm.DB
 
 func main() {
-	initDB()
+	// koneksi MySQL
+	dsn := "root:@tcp(127.0.0.1:3306)/keuangan?charset=utf8mb4&parseTime=True&loc=Local"
+	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+	db = database
+	db.AutoMigrate(&Transaction{})
+
 	r := gin.Default()
 
-	// GET semua transaksi
+	// ambil semua transaksi
 	r.GET("/transactions", func(c *gin.Context) {
 		var transactions []Transaction
-		DB.Find(&transactions)
+		db.Find(&transactions)
 		c.JSON(http.StatusOK, transactions)
 	})
 
-	// POST tambah transaksi
+	// tambah transaksi baru
 	r.POST("/transactions", func(c *gin.Context) {
-		var transaction Transaction
-		if err := c.ShouldBindJSON(&transaction); err != nil {
+		var t Transaction
+		if err := c.ShouldBindJSON(&t); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		DB.Create(&transaction)
-		c.JSON(http.StatusOK, transaction)
+		db.Create(&t)
+		c.JSON(http.StatusOK, t)
 	})
 
-	// PUT update transaksi
-	r.PUT("/transactions/:id", func(c *gin.Context) {
-		var transaction Transaction
-		id := c.Param("id")
-		if err := DB.First(&transaction, id).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Data tidak ditemukan"})
-			return
-		}
-		if err := c.ShouldBindJSON(&transaction); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		DB.Save(&transaction)
-		c.JSON(http.StatusOK, transaction)
-	})
+	// update transaksi
+r.PUT("/transactions/:id", func(c *gin.Context) {
+    id := c.Param("id")
+    var t Transaction
+    if err := db.First(&t, id).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Transaksi tidak ditemukan"})
+        return
+    }
 
-	// DELETE hapus transaksi
+    var input Transaction
+    if err := c.ShouldBindJSON(&input); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    // update field sesuai input
+    t.Type = input.Type
+    t.Category = input.Category
+    t.Amount = input.Amount
+    t.Date = input.Date
+    t.Note = input.Note
+    t.Description = input.Description
+
+    db.Save(&t)
+    c.JSON(http.StatusOK, t)
+})
+
+	// hapus transaksi
 	r.DELETE("/transactions/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		DB.Delete(&Transaction{}, id)
-		c.JSON(http.StatusOK, gin.H{"message": "Data berhasil dihapus"})
+		if err := db.Delete(&Transaction{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal hapus transaksi"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Transaksi berhasil dihapus"})
 	})
 
-	// Jalankan server
-	r.Run(":8080")
+	r.Run(":8080") // backend jalan di port 8080
 }
