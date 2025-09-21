@@ -1,214 +1,263 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
+import './App.css';
 
-export default function App() {
+function App() {
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState({
-    type: "Income",
-    category: "",
-    amount: "",
-    date: "",
-    note: "",
+    type: 'Income',
+    category: '',
+    amount: '',
+    date: '',
+    note: '',
   });
   const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState(null);
+  const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
+
+  useEffect(() => {
+    fetchData();
+    fetchSummary();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/transactions');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setTransactions(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Gagal memuat data. Periksa koneksi backend.');
+    }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/summary');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setSummary(data);
+    } catch (error) {
+      console.error('Error fetching summary:', error);
+      setError('Gagal memuat summary.');
+    }
+  };
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    const url = 'http://localhost:8080/transactions';
 
-    if (editingId) {
-      setTransactions(
-        transactions.map((t) =>
-          t.id === editingId ? { ...form, id: editingId } : t
-        )
-      );
-      setEditingId(null);
-    } else {
-      const newTransaction = {
-        ...form,
-        id: Date.now(),
-      };
-      setTransactions([...transactions, newTransaction]);
+    try {
+      let response;
+      if (editingId) {
+        response = await fetch(`${url}/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...form,
+            amount: parseFloat(form.amount),
+            id: parseInt(editingId),
+          }),
+        });
+      } else {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...form,
+            amount: parseFloat(form.amount),
+          }),
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const updatedTransaction = await response.json();
+      if (editingId) {
+        setTransactions(
+          transactions.map((t) =>
+            t.id === parseInt(editingId) ? { ...updatedTransaction } : t
+          )
+        );
+        setEditingId(null);
+      } else {
+        setTransactions([...transactions, updatedTransaction]);
+      }
+
+      setForm({
+        type: 'Income',
+        category: '',
+        amount: '',
+        date: '',
+        note: '',
+      });
+      setError(null);
+      fetchSummary(); // Perbarui summary setelah transaksi baru
+    } catch (error) {
+      console.error('Error saving data:', error);
+      setError(`Gagal menyimpan data: ${error.message}`);
     }
-
-    setForm({
-      type: "Income",
-      category: "",
-      amount: "",
-      date: "",
-      note: "",
-    });
   };
 
   const handleEdit = (transaction) => {
-    setForm(transaction);
-    setEditingId(transaction.id);
+    setForm({
+      type: transaction.type,
+      category: transaction.category,
+      amount: transaction.amount,
+      date: transaction.date,
+      note: transaction.note,
+    });
+    setEditingId(transaction.id.toString());
   };
 
-  const handleDelete = (id) => {
-    setTransactions(transactions.filter((t) => t.id !== id));
+  const handleDelete = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:8080/transactions/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      setTransactions(transactions.filter((t) => t.id !== id));
+      setError(null);
+      fetchSummary(); // Perbarui summary setelah penghapusan
+    } catch (error) {
+      console.error('Error deleting data:', error);
+      setError(`Gagal menghapus data: ${error.message}`);
+    }
   };
-
-  // Hitung total income, expense, balance
-  const income = transactions
-    .filter((t) => t.type === "Income")
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-
-  const expense = transactions
-    .filter((t) => t.type === "Expense")
-    .reduce((acc, t) => acc + Number(t.amount), 0);
-
-  const balance = income - expense;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-4xl font-bold mb-6 text-center">
-        💰 Pengelolaan Keuangan Pribadi 💰
-      </h1>
-
-      {/* Ringkasan */}
-      <div className="grid grid-cols-3 gap-6 text-center mb-8">
-        <div className="bg-green-100 p-6 rounded shadow">
-          <h2 className="text-2xl font-bold text-green-700">Income</h2>
-          <p className="text-3xl font-extrabold text-green-800">
-            Rp {income.toLocaleString("id-ID")}
-          </p>
-        </div>
-        <div className="bg-red-100 p-6 rounded shadow">
-          <h2 className="text-2xl font-bold text-red-700">Expense</h2>
-          <p className="text-3xl font-extrabold text-red-800">
-            Rp {expense.toLocaleString("id-ID")}
-          </p>
-        </div>
-        <div className="bg-blue-100 p-6 rounded shadow">
-          <h2 className="text-2xl font-bold text-blue-700">Balance</h2>
-          <p className="text-3xl font-extrabold text-blue-800">
-            Rp {balance.toLocaleString("id-ID")}
-          </p>
-        </div>
+    <div className="container">
+      <div className="header">
+        <h1>Pengelolaan Keuangan Pribadi <span role="img" aria-label="money"></span></h1>
       </div>
-
-      {/* Form Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="grid grid-cols-2 gap-4 bg-white p-6 shadow rounded mb-8"
-      >
-        <select
-          name="type"
-          value={form.type}
-          onChange={handleChange}
-          className="border p-4 rounded text-2xl font-semibold w-full h-16 appearance-none"
-        >
-          <option value="Income">Income</option>
-          <option value="Expense">Expense</option>
-        </select>
-
-        <input
-          type="text"
-          name="category"
-          placeholder="Category"
-          value={form.category}
-          onChange={handleChange}
-          className="border p-3 rounded text-xl font-semibold w-full h-14"
-          required
-        />
-
-        <input
-          type="number"
-          name="amount"
-          placeholder="Amount"
-          value={form.amount}
-          onChange={handleChange}
-          className="border p-10 rounded text-xl font-semibold w-full h-20"
-          required
-        />
-
-        <input
-          type="date"
-          name="date"
-          value={form.date}
-          onChange={handleChange}
-          className="border p-3 rounded text-xl font-semibold w-full h-14"
-          required
-        />
-
-        <input
-          type="text"
-          name="note"
-          placeholder="Note"
-          value={form.note}
-          onChange={handleChange}
-          className="border p-3 rounded text-xl font-semibold w-full h-14 col-span-2"
-        />
-
-        <button
-          type="submit"
-          className="bg-blue-500 hover:bg-blue-600 text-white rounded col-span-2 text-xl font-bold h-14 w-full"
-        >
-          {editingId ? "Update Transaksi" : "Tambah Transaksi"}
-        </button>
+      <form onSubmit={handleSubmit} className="form-group">
+        <div className="form-field">
+          <label>Type</label>
+          <select name="type" value={form.type} onChange={handleChange}>
+            <option value="Income">Income</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+        <div className="form-field">
+          <label>Category</label>
+          <input
+            type="text"
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+            placeholder="Category"
+            required
+          />
+        </div>
+        <div className="form-field">
+          <label>Amount</label>
+          <input
+            type="number"
+            name="amount"
+            value={form.amount}
+            onChange={handleChange}
+            placeholder="Amount"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="form-field">
+          <label>Date</label>
+          <input
+            type="date"
+            name="date"
+            value={form.date}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-field">
+          <label>Note</label>
+          <input
+            type="text"
+            name="note"
+            value={form.note}
+            onChange={handleChange}
+            placeholder="Note"
+          />
+        </div>
+        <div className="form-field">
+          <button type="submit">{editingId ? 'Update Transaksi' : 'Tambah Transaksi'}</button>
+        </div>
       </form>
-
-      {/* Tabel Transaksi */}
-      <h2 className="text-2xl font-bold mb-4">📋 Daftar Transaksi</h2>
-      <table className="w-full text-left border-collapse text-xl">
-        <thead>
-          <tr className="bg-gray-2000">
-            <th className="border px-10 py-4">Date</th>
-            <th className="border px-10 py-4">Type</th>
-            <th className="border px-10 py-4">Category</th>
-            <th className="border px-10 py-4">Amount</th>
-            <th className="border px-10 py-4">Note</th>
-            <th className="border px-10 py-4">Aksi</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {transactions.length === 0 ? (
+      {error && <div className="error-message">{error}</div>}
+      <div className="summary-section">
+        <h2>Summary <span role="img" aria-label="chart">📊</span></h2>
+        <table className="summary-table">
+          <thead>
             <tr>
-              <td colSpan="15" className="text-center p-10 text-gray-500">
-                Belum ada transaksi
-              </td>
+              <th>Item</th>
+              <th>Amount (Rp)</th>
             </tr>
-          ) : (
-            transactions.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50">
-                <td className="p-3 border">
-                  {new Date(t.date).toLocaleDateString("id-ID")}
-                </td>
-                <td
-                  className={`p-3 border font-bold ${
-                    t.type === "Income" ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {t.type}
-                </td>
-                <td className="p-3 border">{t.category}</td>
-                <td className="p-3 border">
-                  Rp {Number(t.amount).toLocaleString("id-ID")}
-                </td>
-                <td className="p-3 border">{t.note}</td>
-                <td className="p-3 border flex gap-3">
-                  <button
-                    onClick={() => handleEdit(t)}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-lg"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(t.id)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-lg"
-                  >
-                    Hapus
-                  </button>
-                </td>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Total Income</td>
+              <td>{summary.totalIncome.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Total Expense</td>
+              <td>{summary.totalExpense.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Balance</td>
+              <td>{summary.balance.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="table-section">
+        <h2>📋 Daftar Transaksi <span role="img" aria-label="list"></span></h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Amount</th>
+              <th>Note</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="no-data">Belum ada transaksi</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              transactions.map((t) => (
+                <tr key={t.id}>
+                  <td>{new Date(t.date).toLocaleDateString('id-ID')}</td>
+                  <td>{t.type}</td>
+                  <td>{t.category}</td>
+                  <td>{t.amount}</td>
+                  <td>{t.note}</td>
+                  <td>
+                    <button onClick={() => handleEdit(t)}>Edit</button>
+                    <button onClick={() => handleDelete(t.id)}>Hapus</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
+
+export default App;
