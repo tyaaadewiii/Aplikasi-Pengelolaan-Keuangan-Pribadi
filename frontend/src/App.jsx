@@ -100,7 +100,7 @@ function App() {
         note: '',
       });
       setError(null);
-      fetchSummary(); // Perbarui summary setelah transaksi baru
+      fetchSummary(); 
     } catch (error) {
       console.error('Error saving data:', error);
       setError(`Gagal menyimpan data: ${error.message}`);
@@ -207,15 +207,15 @@ function App() {
           <tbody>
             <tr>
               <td>Total Income</td>
-              <td>{summary.totalIncome.toFixed(2)}</td>
+              <td>{summary.totalIncome.toLocaleString("id-ID", { style: "currency", currency: "IDR" })}</td>
             </tr>
             <tr>
               <td>Total Expense</td>
-              <td>{summary.totalExpense.toFixed(2)}</td>
+              <td>{summary.totalExpense.toLocaleString("id-ID", { style: "currency", currency: "IDR" })}</td>
             </tr>
             <tr>
               <td>Balance</td>
-              <td>{summary.balance.toFixed(2)}</td>
+              <td>{summary.balance.toLocaleString("id-ID", { style: "currency", currency: "IDR" })}</td>
             </tr>
           </tbody>
         </table>
@@ -244,7 +244,7 @@ function App() {
                   <td>{new Date(t.date).toLocaleDateString('id-ID')}</td>
                   <td>{t.type}</td>
                   <td>{t.category}</td>
-                  <td>{t.amount}</td>
+                  <td>{Number(t.amount).toLocaleString("id-ID", { style: "currency", currency: "IDR" })}</td>
                   <td>{t.note}</td>
                   <td>
                     <button onClick={() => handleEdit(t)}>Edit</button>
